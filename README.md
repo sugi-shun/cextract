@@ -14,9 +14,6 @@ The extraction process involves the following steps:
 4.  Content Building: A post-processing step (`content_builder.build`) aggregates the high-scoring elements and reconstructs the clean article text.
 
 ## Prerequisites
-
-To run this pipeline, you need the following Python libraries. A `requirements.txt` file would typically list these dependencies.
-
   * `pandas`
   * `beautifulsoup4`
   * `tensorflow` (CPU recommended, as configured in the script)
