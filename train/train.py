@@ -239,7 +239,7 @@ if __name__ == "__main__":
     print("学習開始...")
     model.fit(
         X_inputs, y_train,
-        epochs=10,
+        epochs=30,
         batch_size=32,
         class_weight=class_weight,
         verbose=1
@@ -275,7 +275,7 @@ if __name__ == "__main__":
 
     # 1. Kerasモデルの保存
     model.save(MODEL_FILENAME)
-    print(f"✅ Kerasモデルを '{MODEL_FILENAME}' に保存しました。")
+    print(f"Kerasモデルを '{MODEL_FILENAME}' に保存しました。")
 
     # 2. Preprocessorの保存
     try:

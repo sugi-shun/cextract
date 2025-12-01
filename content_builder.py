@@ -1,31 +1,35 @@
 import re
+from typing import Any, Dict
+
 import pandas as pd
 
 regex = re.compile(r"\{id([0-9]+)\}")
 
-def build(df, threshold=0.8):
+
+def resolve(id_str, d, cache):
+    if id_str in cache:
+        return cache[id_str]
+
+    if id_str not in d:
+        return ""
+
+    content = d[id_str]
+
+    def repl(m):
+        return resolve(m.group(1), d, cache)
+
+    resolved = regex.sub(repl, content)
+    cache[id_str] = resolved
+    return resolved
+
+
+def build(df: pd.DataFrame, threshold: float = 0.8) -> str:
     df_fix = df[df["pred"] > threshold]
-    d = {str(idx): content for idx, content in zip(df_fix["id"], df_fix["contents"])}
-    for k in sorted(list(d.keys())):
-        if k not in d:
-            continue
-        if not isinstance(d[k], str):
-            del d[k]
-            continue
-        repids = re.findall(regex, d[k])
-        while repids:
-            for idx in repids:
-                idx = str(idx)
-                if idx in d:
-                    if isinstance(d, str):
-                        d[k] = d[k].replace(f"{{id{idx}}}", d[idx])
-                    del d[idx]
-                else:
-                    d[k] = d[k].replace(f"{{id{idx}}}", "")
-            repids = re.findall(regex, d[k])
-    return ' '.join([d[k] for k in sorted(list(d.keys()))]).replace("[ID_NOT_FOUND]", "")
 
+    d = {str(idx): c for idx, c in zip(df_fix["id"], df_fix["contents"]) if isinstance(c, str)}
 
-if __name__ == "__main__":
-    df = pd.read_csv("example.csv")
-    print(build(df))
+    cache = {}
+    final_ids = sorted(int(k) for k in d.keys())
+    out = [resolve(str(k), d, cache) for k in final_ids]
+
+    return " ".join(out)

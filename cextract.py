@@ -197,6 +197,6 @@ if __name__ == "__main__":
     df = pd.DataFrame(dom_array)
     df_pred = predict(model, preprocessor, df)
     print("building...")
-    content = content_builder.build(df_pred)
+    content = content_builder.build(df_pred, 0.9)
     print(content)
     df_pred.to_csv("example.csv", index=False)
