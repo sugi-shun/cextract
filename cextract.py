@@ -10,9 +10,9 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 
+import content_builder
 from download_html import download
 from html2csv import extract_dom_data
-import content_builder
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -100,6 +100,35 @@ class DOMPreprocessor:
             "numeric_in": nums_scaled
         }
 
+    def transform(self, df: pd.DataFrame) -> Dict[str, np.ndarray]:
+        if not self.is_fitted:
+            raise Exception("Preprocessor not fitted!")
+        all_xpaths = [self._clean_xpath(x) for x in df['xpath']]
+        xpath_seq = self.tag_tokenizer.texts_to_sequences(all_xpaths)
+        xpath_pad = pad_sequences(xpath_seq, maxlen=CONFIG["MAX_XPATH_LEN"], padding='post')
+
+        all_keys, all_values = [], []
+        for a_json in df['attributes']:
+            keys, values = self._parse_attributes(a_json)
+            all_keys.append(keys)
+            all_values.append(values)
+
+        key_seq = self.attr_tokenizer.texts_to_sequences(all_keys)
+        key_pad = pad_sequences(key_seq, maxlen=CONFIG["MAX_ATTR_KEY_LEN"], padding='post')
+
+        val_seq = self.attr_tokenizer.texts_to_sequences(all_values)
+        val_pad = pad_sequences(val_seq, maxlen=CONFIG["MAX_ATTR_VAL_LEN"], padding='post')
+
+        numeric_data = np.array(df.apply(self._extract_numeric_features, axis=1).tolist())
+        nums_scaled = self.scaler.transform(numeric_data)
+
+        return {
+            "xpath_in": xpath_pad,
+            "attr_key_in": key_pad,
+            "attr_val_in": val_pad,
+            "numeric_in": nums_scaled
+        }
+
 
 def clean_structure_garbage(df, xpath_col='xpath'):
     initial_count = len(df)
@@ -143,24 +172,31 @@ def clean_structure_garbage(df, xpath_col='xpath'):
 
 def predict(model, preprocessor, df):
     df_fix = clean_structure_garbage(df, xpath_col='xpath')
-    out = []
-    for i, d in df_fix.iterrows():
-        input_tensor = preprocessor.transform_single(d.to_dict())
-        pred_prob = model.predict(input_tensor, verbose=0)[0][0]
-        out.append(pred_prob)
-    df_fix["pred"] = out
+    if df_fix.empty:
+        df_fix["pred"] = []
+        return df_fix
+    input_tensor_batch = preprocessor.transform(df_fix)
+    pred_probs = model.predict(input_tensor_batch, verbose=0)
+    df_fix["pred"] = pred_probs.flatten()
+
     return df_fix
 
 
 if __name__ == "__main__":
     import sys
     url = sys.argv[1]
+    print("loading...")
     model = tf.keras.models.load_model('models/dom_predictor_model.h5')
     with open("models/dom_preprocessor.pkl", "rb") as f:
         preprocessor = pickle.load(f)
+    print("downloading...")
     html = download(url)
+    print("extracting...")
     dom_array = extract_dom_data(html)
+    print("predicting...")
     df = pd.DataFrame(dom_array)
     df_pred = predict(model, preprocessor, df)
+    print("building...")
     content = content_builder.build(df_pred)
     print(content)
+    df_pred.to_csv("example.csv", index=False)
