@@ -32,4 +32,4 @@ def build(df: pd.DataFrame, threshold: float = 0.8) -> str:
     final_ids = sorted(int(k) for k in d.keys())
     out = [resolve(str(k), d, cache) for k in final_ids]
 
-    return " ".join(out)
+    return " ".join(out).replace("[ID_NOT_FOUND]", "")
